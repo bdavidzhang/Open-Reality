@@ -4,7 +4,7 @@
 
 ### One phone. Any space. Real spatial intelligence.
 
-**HackIllinois 2026 — Modal Track**
+**HackIllinois 2026 — 🥇 Modal Track · Best Use of Gemini API · Most Creative**
 
 <br />
 
@@ -36,13 +36,21 @@ Today's AI agents are spatially blind. They process pixels and text, but have no
 
 ## What We Built
 
-Open Reality is a cloud-native spatial AI platform. Describe your task. Point a phone. An AI agent maps your space in real time, finds your targets, and answers spatial questions — from any browser, from anywhere.
+Open Reality is a cloud-native spatial AI platform. Describe your task. Point a phone — or drop a video, or upload a folder of images. An AI agent maps your space in real time, finds your targets, and answers spatial questions — from any browser, from anywhere.
+
+### Input Modes
+
+| Mode | How |
+|------|-----|
+| **Live Camera** | Open a link on any phone browser. No app install. Stream directly. |
+| **Video File** | Upload a recorded walkthrough — MP4, MOV, or any standard format. |
+| **Image Folder** | Drop a folder of frames (e.g. extracted with `ffmpeg`). Full offline SLAM. |
 
 ### The Experience
 
 1. **Describe your mission** — *"I'm a paramedic doing a safety sweep."*
 2. **Get a spatial plan** — the AI agent generates what to look for and how to move through the space.
-3. **Open the camera** — no app install. Just a link in your phone's browser.
+3. **Capture the space** — live camera, uploaded video, or image folder.
 4. **Walk the space** — a dense 3D point cloud builds live as you move.
 5. **The agent finds your targets** — objects are detected, pinned in 3D, and available for spatial Q&A.
 
@@ -73,11 +81,35 @@ This is Modal the way it's meant to be used: serious inference, at real-time spe
 
 ---
 
-## Live Demo
+## Demo
 
-Scan the QR code at our booth, or visit the deployed URL. Point your phone at anything in the room. Watch the 3D map build in real time. Ask the agent to find something.
+Deploy your own instance of OpenReality in one command and get a stable public URL instantly.
 
-No app. No hardware. Just a browser.
+```bash
+modal deploy modal_streaming.py
+```
+
+Modal will output a URL like `https://yourname--vggt-slam-streaming-web.modal.run`. Open that on any device. Point your phone at a room. Watch the 3D map build in real time. Ask the agent to find something.
+
+No app. No hardware. Just a browser and your Modal account.
+
+---
+
+## Use Cases
+
+The same platform, tuned to radically different missions — just by changing the prompt.
+
+| Scenario | Mission Prompt | What the Agent Finds |
+|----------|---------------|----------------------|
+| **Active Fire Scene** | *"I'm a firefighter doing a sweep of a multi-story office building before full evacuation."* | Fire extinguishers, standpipe connections, exit signs, gas shutoff valves, victims |
+| **Post-Natural Disaster** | *"I'm a search-and-rescue coordinator mapping a building after an earthquake."* | Structural damage, blocked exits, trapped victims, hazardous material spills, load-bearing failures |
+| **Pre-Listing Property Walkthrough** | *"I'm a realtor doing a pre-listing inspection of a vacant house."* | Scuffed walls, dated fixtures, worn carpet, stained grout, foggy window panes |
+| **Hotel Room Safety Inspection** | *"I'm a health inspector auditing a hotel room."* | Mold, missing smoke detector components, broken seals, window latch failures |
+| **Post-Burglary Home Walkthrough** | *"I'm documenting damage after a break-in for an insurance claim."* | Forced entry points, ransacked areas, broken displays, emptied safes |
+| **Construction Site Safety Audit** | *"I'm a site safety officer doing a compliance walkthrough."* | Exposed rebar, unsecured ladders, open floor penetrations, missing guardrails, blocked exits |
+| **Flood-Damaged Home Inspection** | *"I'm a loss adjuster inspecting a home after indoor flooding."* | Waterlogged surfaces, swollen drywall, delaminating cabinets, soft subfloor, standing water |
+
+The hardware barrier is gone. The deployment barrier is gone. What remains is the mission.
 
 ---
 
@@ -143,13 +175,17 @@ python main.py --image_folder office_loop --max_loops 1 --vis_map
 
 ### Collecting Custom Data
 
-Record a video with any phone and extract frames:
+Open Reality accepts three input types:
+
+**Live camera** — open the sender page on any phone, no install needed.
+
+**Recorded video** — upload directly via the UI, or extract frames manually:
 
 ```bash
 ffmpeg -i /path/to/video.MOV -vf "fps=10" /path/to/frames/frame_%04d.jpg
 ```
 
-Use horizontal video for best results. Images are sorted by the numeric value in their filename.
+**Image folder** — pass any folder of frames to `--image_folder`. Images are sorted by the numeric value in their filename. Use horizontal video for best results.
 
 ### Key Parameters
 
@@ -168,7 +204,7 @@ Use horizontal video for best results. Images are sorted by the numeric value in
 ## Architecture
 
 ```
-Phone Camera
+Phone Camera / Video File / Image Folder
     ↓  WebSocket stream (HTTPS via Modal tunnel)
 Keyframe Selection
     Lucas-Kanade optical flow — skip frames without motion
@@ -210,22 +246,6 @@ Spatial Agent (Claude / Gemini)
 | `sender.html` | Camera/video input — streams frames to the server |
 | `plan.html` | Agent plan visualization — mission planning UI |
 | `summary.html` | Detection summary — 2D floorplan + 3D overview + spatial Q&A |
-
----
-
-## Impact
-
-The people who need spatial awareness most are the ones who can least afford to wait.
-
-| Domain | Application |
-|--------|-------------|
-| **First Responders** | Pre-scan buildings before entering a fire or active scene |
-| **Accessibility** | Navigation context for the visually impaired in unfamiliar spaces |
-| **Disaster Response** | Rapid structural mapping in search-and-rescue operations |
-| **Construction** | Live spatial documentation without LiDAR hardware |
-| **Robotics** | Generate real-world 3D training data from any phone |
-
-The hardware barrier is gone. The deployment barrier is gone. What remains is the mission.
 
 ---
 
