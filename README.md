@@ -179,13 +179,7 @@ Open Reality accepts three input types:
 
 **Live camera** — open the sender page on any phone, no install needed.
 
-**Recorded video** — upload directly via the UI, or extract frames manually:
-
-```bash
-ffmpeg -i /path/to/video.MOV -vf "fps=10" /path/to/frames/frame_%04d.jpg
-```
-
-**Image folder** — pass any folder of frames to `--image_folder`. Images are sorted by the numeric value in their filename. Use horizontal video for best results.
+**Recorded video** — upload directly via the UI, or extract frames manually.
 
 ### Key Parameters
 
