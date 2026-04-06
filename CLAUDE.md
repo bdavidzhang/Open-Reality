@@ -254,6 +254,96 @@ npm run build    # Bundle to dist/
 - `perception_models/` — Facebook Perception Encoder CLIP (optional, for open-set detection)
 - `sam3/` — SAM3 segmentation model (optional, for open-set 3D object detection)
 
+## Code Structure
+
+### Top-level files
+
+| File | Purpose |
+|------|---------|
+| `main.py` | Standalone SLAM demo entry point — loads VGGT, iterates submaps, optionally logs results |
+| `modal_app.py` | Modal batch job — uploads images to A100, runs SLAM, downloads poses/point clouds |
+| `modal_streaming.py` | Modal persistent ASGI server — builds frontend at image-build time, serves WebSocket clients |
+| `visualize_results.py` | Offline point-cloud viewer — loads `.npz` SLAM output, renders with Viser |
+| `setup.py` | Package metadata (`vggt_slam` v2.0.0) |
+| `setup.sh` / `dev_setup.sh` | Install deps, clone third-party repos into `third_party/` |
+| `requirements.txt` | Python deps (torch 2.3.1, gtsam-develop, viser 0.2.23, Flask, python-socketio, openai, etc.) |
+
+### `vggt_slam/` — Core SLAM module
+
+| File | Key class / function | Role |
+|------|---------------------|------|
+| `solver.py` | `Solver` | Central coordinator — owns GraphMap, PoseGraph, ImageRetrieval, FrameTracker, Viewer; `run_predictions()` runs VGGT inference; `reset()` reinitializes without reloading models |
+| `map.py` | `GraphMap` | Dict of `Submap` objects keyed by submap ID; `retrieve_best_semantic_frame()` does cosine-similarity CLIP search |
+| `submap.py` | `Submap` | Per-submap bundle of images, poses, world points, colors, confidences, CLIP vectors; `get_points_in_mask()` projects 2D masks to 3D |
+| `graph.py` | `PoseGraph` | GTSAM SL(4) factor graph; `add_homography()`, `add_between_factor()`, `optimize()` (Levenberg-Marquardt) |
+| `frame_overlap.py` | `FrameTracker` | Lucas-Kanade optical flow keyframe selector; `compute_disparity()` gates new keyframes |
+| `loop_closure.py` | `ImageRetrieval`, `LoopMatchQueue` | SALAD descriptor model for image retrieval; `find_loop_closures()` returns top-K matches |
+| `object_detector.py` | `ObjectDetector` | PE-Core CLIP + SAM3 wrapper; `encode_text()`, `segment()`, `compute_3d_bbox()` |
+| `scale_solver.py` | `estimate_scale_pairwise()` | Median depth-ratio scale estimation between overlapping submaps |
+| `slam_utils.py` | `Accumulator` + geometry helpers | `compute_image_embeddings()`, `cosine_similarity()`, `sort_images_by_number()`, `Accumulator` timer |
+| `viewer.py` | `Viewer` | Viser server — renders camera frustums + point clouds; `visualize_frames()`, `run_walkthrough()` |
+
+### `server/` — Streaming server and agent system
+
+| File | Key class | Role |
+|------|-----------|------|
+| `app.py` | Flask + SocketIO app | Main WebSocket server; handles `frame` events, broadcasts `slam_update`; manages agent sessions; `POST /reset`, `POST /api/plan` (Gemini); `VideoFeeder` for offline testing |
+| `streaming_slam.py` | `StreamingSLAM` | Wraps `Solver` for frame-by-frame input; `add_frame()`, `process_submap()`, `extract_stream_data()`, `soft_reset()`, `set_active_queries()` |
+| `spatial_agent.py` | `SpatialAgent`, `Mission` | Autonomous exploration orchestrator using OpenRouter LLM; multi-mission tracking, stall detection, adaptive query generation |
+| `llm/openrouter_client.py` | `OpenRouterClient` | Resilient LLM client with fallback chains, JSON parsing, timeout/retry |
+| `agent/runtime.py` | `AgentRuntime` | Session-scoped tool executor; registers VGGT tools + UI tools; `execute_tool()` with validated args |
+| `agent/schemas.py` | Pydantic models | Tool arg/return schemas: `GetSceneSnapshotArgs`, `SearchObjectsArgs`, `LocateObject3DArgs`, `AgentUICommand`, etc. |
+| `agent/scene_index.py` | `SceneIndex` | Thread-safe, deduplicating in-memory detection cache; `ingest()`, `search()`, `best_recent()` |
+| `agent/tool_registry.py` | `ToolRegistry`, `ToolDefinition` | Thread-pool executor with Pydantic validation and timeouts |
+| `agent/tools/vggt_tools.py` | `VGGTTools` | SLAM-backed tools: `get_scene_snapshot()`, `search_objects()`, `locate_object_3d()`, `infer_spatial_relations()` |
+| `agent/tools/ui_tools.py` | `UITools` | UI commands: `focus_detection_ui()`, `show_waypoint_ui()`, `show_path_ui()`, `show_toast_ui()` |
+
+### `server/webserver/` — TypeScript/Vite frontend
+
+**HTML entry points → TypeScript modules:**
+
+| HTML | TS | Purpose |
+|------|----|---------|
+| `index.html` | `src/main.ts` | Main 3D SLAM viewer (Babylon.js); camera controls, point cloud rendering |
+| `sender.html` | `src/sender.ts` | Camera/video capture + base64 frame emission to server |
+| `summary.html` | `src/summary.ts` | Scene summary dashboard — detection results, mission status |
+| `plan.html` | `src/plan.ts` | Mission planning UI — goal input, query suggestions |
+| `detection-debug.html` | `src/detection-debug.ts` | Debug overlay for segmentation masks and confidence scores |
+
+**Services (`src/services/`):**
+
+| File | Role |
+|------|------|
+| `SLAMConnection.ts` | Socket.IO connection manager — emits frames, receives `slam_update`/`global_map` |
+| `SceneManager.ts` | Scene state sync — `updateMap()`, `updateDetections()`, `focusOnDetection()` |
+| `DedalusAPI.ts` | HTTP client for agent REST endpoints |
+
+**Components (`src/components/`):**
+
+| File | Role |
+|------|------|
+| `UIManager.ts` | Panels, toasts, detection/mission UI rendering, event dispatch |
+| `AgentPanel.ts` | Agent control and mission status UI |
+| `HeroScene.ts` | Landing page hero section |
+| `MeshBackground.ts` | Animated background mesh |
+
+### `evals/` — Benchmarks
+
+| File | Role |
+|------|------|
+| `eval_tum.sh` | Batch TUM RGB-D evaluation — set `abs_dir` to dataset location |
+| `eval_7scenes.sh` | Batch 7-Scenes evaluation |
+| `process_logs_tum.py` | Convert SLAM poses to TUM format, compute ATE/RTE metrics |
+
+### `third_party/` — External models (installed by `setup.sh`)
+
+| Dir | Model | Used for |
+|-----|-------|---------|
+| `vggt/` | VGGT_SPARK | Dense depth + SL(4) pose prediction |
+| `salad/` | DINO-Salad | Loop closure image descriptors |
+| `perception_models/` | PE-Core CLIP | Semantic embeddings for open-set detection |
+| `sam3/` | SAM3 | Instance segmentation for 3D bounding boxes |
+
 ## Conventions
 
 | Data | Shape / dtype |
