@@ -197,6 +197,8 @@ Open Reality accepts three input types:
 
 ## Architecture
 
+![Architecture](architecture_v2.svg)
+
 ```
 Phone Camera / Video File / Image Folder
     ↓  WebSocket stream (HTTPS via Modal tunnel)
